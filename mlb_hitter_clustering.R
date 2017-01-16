@@ -2,13 +2,16 @@
 # on hitters and perform a clustering analysis on them
 
 library(ape)
+library(ggplot2)
+library(MASS)
+library(sm)
 
 # Connect to the SQL server hosting the data
 library(RMySQL)
 con <- dbConnect(RMySQL::MySQL(), dbname = "stats", 
                  host = "localhost", 
-                 username = "noneya", 
-                 password = "business", 
+                 username = "root", 
+                 password = "root", 
                  unix.socket = "/Applications/MAMP/tmp/mysql/mysql.sock", 
                  port = 3306)
 
@@ -17,21 +20,19 @@ con <- dbConnect(RMySQL::MySQL(), dbname = "stats",
 # they changed teams. Then merge the data for a single player in consecutive
 # years.
 
-yrs <- c(1996:2015)
+yrs <- c(1965:2015)
 for(j in 1:length(yrs)){
     # Here's my SQL query for each year.
     str1 <- "SELECT bat.playerID, mas.nameFirst, mas.nameLast, bat.yearID, 
     bat.teamID, bat.G, bat.AB, bat.R, bat.H, bat.2B, bat.3B, bat.HR, bat.RBI, 
     bat.SB, bat.CS, bat.BB, bat.SO, bat.IBB, bat.HBP, bat.SH, bat.SF, bat.GIDP, 
-    app.G_all, app.G_p, fie.G as G_field, fie.PO as PO_field, fie.A as A_field, 
-    fie.E as E_field 
-    FROM batting as bat, master as mas, appearances as app, fielding as fie
+    app.G_all, app.G_p
+    FROM batting as bat, master as mas, appearances as app
     WHERE mas.playerID=bat.playerID AND app.playerID=mas.playerID AND 
-    fie.playerID=mas.playerID AND bat.yearID="
+    bat.yearID="
     str2 <- as.character(yrs[j])
-    str3 <- " AND fie.yearID="
-    str4 <- ";"
-    all.query <- dbGetQuery(con, paste(c(str1, str2, str3, str2, str4), collapse = ''))
+    str3 <- ";"
+    all.query <- dbGetQuery(con, paste(c(str1, str2, str3), collapse = ''))
     
     # First! Before going forward, change the 2B, 3B labels to "doubles" and "triples"
     colnames(all.query)[10] <- "doubles"
@@ -145,22 +146,6 @@ for(j in 1:length(yrs)){
         all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$G_p <- 
             all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$G_p + 
             all.query[all.query$playerID == the.dupes$playerID[i], ][2,]$G_p
-
-        all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$G_field <- 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$G_field + 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][2,]$G_field
-
-        all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$PO_field <- 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$PO_field + 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][2,]$PO_field
-
-        all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$A_field <- 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$A_field + 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][2,]$A_field
-
-        all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$E_field <- 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][1,]$E_field + 
-            all.query[all.query$playerID == the.dupes$playerID[i], ][2,]$E_field
     }
     
     ### Finally, remove all duplicates now that the stats have been merged!
@@ -251,22 +236,6 @@ for(j in 1:length(yrs)){
             overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$G_p <- 
                 overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$G_p + 
                 overall.new[overall.new$playerID == the.dupes$playerID[i], ][2,]$G_p
-            
-            overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$G_field <- 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$G_field + 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][2,]$G_field
-            
-            overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$PO_field <- 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$PO_field + 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][2,]$PO_field
-            
-            overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$A_field <- 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$A_field + 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][2,]$A_field
-            
-            overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$E_field <- 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][1,]$E_field + 
-                overall.new[overall.new$playerID == the.dupes$playerID[i], ][2,]$E_field
         }
         
         # Now take out the duplicates, and save it as overall.query and move on
@@ -279,8 +248,16 @@ for(j in 1:length(yrs)){
 # gonzaal01 is Alex S. Gonzalez, so I would just add a " S." to the first name string.
 overall.query$nameFirst[overall.query$playerID == "gonzaal01"] <- paste("Alex", " S.")
 
-# Select just those hitters who have more than 3000 AB over this time period
-hitters <- overall.query[overall.query$AB > 3000,]
+# And after running this over the whole span of 1965-2015, I find four more names 
+# are duplicated: Sandy Alomar, Ken Griffey, Jose Cruz, and Gary Matthews. All are 
+# juniors, as it happens.
+overall.query$nameLast[overall.query$playerID == "alomasa02"] <- "Alomar Jr."
+overall.query$nameLast[overall.query$playerID == "griffke02"] <- "Griffey Jr."
+overall.query$nameLast[overall.query$playerID == "cruzjo02"] <- "Cruz Jr."
+overall.query$nameLast[overall.query$playerID == "matthga02"] <- "Matthews Jr."
+
+# Select just those hitters who have more than 2500 AB over this time period
+hitters <- overall.query[overall.query$AB > 2500,]
 
 nseasons <- hitters$G/162.0
 sb_per_season <- (hitters$SB/nseasons)/max(hitters$SB/nseasons)
@@ -295,13 +272,12 @@ so_per_ab <- (hitters$SO/hitters$AB)/max(hitters$SO/hitters$AB)
 hr_per_ab <- (hitters$HR/hitters$AB)/max(hitters$HR/hitters$AB)
 bb_per_ab <- (hitters$BB/hitters$AB)/max(hitters$BB/hitters$AB)
 doubles_per_ab <- (hitters$doubles/hitters$AB)/max(hitters$doubles/hitters$AB)
-f_percentage <- (hitters$PO_field + hitters$A_field)/(hitters$PO_field + hitters$A_field + hitters$E_field)
 
 # Now append all this stuff I just calculated to the data frame of hitters:
 hitters <- cbind(hitters, sing, obp, 
                  tb, ba, slg, ops, 
                  iso, so_per_ab, hr_per_ab, 
-                 doubles_per_ab, f_percentage, 
+                 doubles_per_ab,  
                  bb_per_ab, sb_per_season)
 colnames(hitters)
 
@@ -316,8 +292,8 @@ for(i in 1:nrow(hitters)){
 }
 
 # Now onto the calculations. The stats I'll use come from 
-# columns 34, 41, 36, 40, 38, and 39
-hitter.data <- hitters[, c(34, 41, 36, 40, 38, 39)]
+# c(30, 36, 32, 35, 34, 33)
+hitter.data <- hitters[, c(30, 36, 32, 35, 34, 33)]
 
 # Get the distance matrix between all stats for all players
 d <- dist(hitter.data)
@@ -330,26 +306,139 @@ g7 <- cutree(c, k = 7)
 
 # Convert to a phylogenetic tree and assign labels as hitter names
 phylo.tree <- as.phylo(c)
-labels(phylo.tree) <- hitter.names
 
-# Choose the color palette, with seven colors selected - one for each group
-labelColors <- c("cadetblue4", "chocolate4", "darkblue", 
-                 "magenta", "firebrick3", "black", "darkgoldenrod3")
+phylo.tree$tip.label <- hitter.names
+
+require("RColorBrewer")
+display.brewer.pal(7, "Set1")
+
+the.colors <- brewer.pal(7, "Set1")[unclass(g7)]
+
+# One thing I'd like to do. I think the yellow color is too bright, so 
+# I want to replace every instance of #FFFF33 with #C6C629
+the.colors[the.colors == "#FFFF33"] <- "#C6C629"
 
 # Make the fan plot, with colors corresponding to each group
 plot(phylo.tree, 
      type = "fan", 
-     cex=0.7,  
-     tip.color = labelColors[g7])
+     cex=0.5,  
+     tip.color = the.colors)
 
 # Now make a scatterplot matrix that displays all the data points for the 
 # parameters I'm tracking in my clustering analysis
-pairs(hitters[c(34, 41, 36, 40, 38, 39)], 
+pairs(hitters[c(30, 36, 32, 35, 34, 33)], 
     main = "Scatterplot Matrix for Hitting Stats", 
-    col = labelColors[unclass(g7)], 
+    col = the.colors, 
     pch = 16, 
     cex = 1.0, 
+    cex.labels = 2.5, 
     labels = c("OPS", "SB/season", 
                "SO/AB", "BB/AB", "2B/AB", 
-               "Fielding Percentage"))
+               "HR/AB"))
 
+
+# I should add "group" onto the dataframe hitters, which will make 
+# the labels of a set of boxplots separated by group, automatically 
+# show the right names.
+groups <- g7
+groups[groups == "1"] <- "Group 1"
+groups[groups == "2"] <- "Group 2"
+groups[groups == "3"] <- "Group 3"
+groups[groups == "4"] <- "Group 4"
+groups[groups == "5"] <- "Group 5"
+groups[groups == "6"] <- "Group 6"
+groups[groups == "7"] <- "Group 7"
+hittersplot <- cbind(hitters, groups)
+colnames(hittersplot)
+
+color.example <- brewer.pal(7, "Set1")
+color.example[color.example == "#FFFF33"] <- "#C6C629"
+
+# Make a grid of figures. Three columns and two rows, with 
+# each showing boxplots of the distributions of each stat
+# separated by group.
+par(mfrow=c(2,3), oma=c(0,0,0,0), mar=c(6,6,6,6))
+
+# The figure below looks really funky in the display panel for 
+# RStudio, but when saved as a figure with width =1200 pix
+# it looks pretty okay.
+boxplot(ops~groups, data=hittersplot, 
+        col=color.example, main="OPS", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.3, cex.axis=1.8, cex.main=2.5)
+
+# I considered adding a horizontal line to each of these panels 
+# to show where the median stat value is for the overall hitter 
+# sample, but ultimately it's too distracting.
+#abline(h=median(hittersplot$ops), lty=2, lwd=2)
+
+boxplot(sb_per_season~groups, data=hittersplot, 
+        col=color.example, main="Stolen Bases Per Season\n (Normalized)", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.3, cex.axis=1.8, cex.main=2.5)
+
+#abline(h=median(hittersplot$sb_per_season), lty=2, lwd=2)
+
+boxplot(so_per_ab~groups, data=hittersplot, 
+        col=color.example, main="Strikeouts Per At-Bat\n (Normalized)", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.3, cex.axis=1.8, cex.main=2.5)
+
+#abline(h=median(hittersplot$so_per_ab), lty=2, lwd=2)
+
+boxplot(bb_per_ab~groups, data=hittersplot, 
+        col=color.example, main="Walks Per At-Bat\n (Normalized)", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.3, cex.axis=1.8, cex.main=2.5)
+
+#abline(h=median(hittersplot$bb_per_ab), lty=2, lwd=2)
+
+boxplot(doubles_per_ab~groups, data=hittersplot, 
+        col=color.example, main="Doubles Per At-Bat\n (Normalized)", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.3, cex.axis=1.8, cex.main=2.5)
+
+#abline(h=median(hittersplot$doubles_per_ab), lty=2, lwd=2)
+
+boxplot(hr_per_ab~groups, data=hittersplot, 
+        col=color.example, main="Homeruns Per At-Bat\n (Normalized)", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.3, cex.axis=1.8, cex.main=2.5)
+
+#abline(h=median(hittersplot$hr_per_ab), lty=2, lwd=2)
+
+boxplot(HR/doubles~groups, data=hittersplot, 
+        col=color.example, main="HR/2B Ratio", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.2, cex.axis=2.0, cex.main=2.5)
+
+# Restore defaults (one plot at a time)!
+par(mfrow=c(1,1))
+
+# We can many any other boxplot figures we want now, separated by group. For 
+# example, the ratio of times a hitter has grounded into a double play per 
+# at-bat?
+boxplot(GIDP/AB~groups, data=hittersplot, 
+        col=color.example, main="GIDP per AB", 
+        boxwex=0.5, pch=16, outcol=color.example, 
+        whisklty=1, cex.lab=1.2, cex.axis=2.0, cex.main=2.5)
+
+
+hitters1 <- hitters[g7 == 1,]
+hitters2 <- hitters[g7 == 2,]
+hitters3 <- hitters[g7 == 3,]
+hitters4 <- hitters[g7 == 4,]
+hitters5 <- hitters[g7 == 5,]
+hitters6 <- hitters[g7 == 6,]
+hitters7 <- hitters[g7 == 7,]
+
+# One last little thing. I'm referencing these groups on a post on my website, and 
+# so to re-create the group colors as precisely as possible I should get the HEX 
+# codes for them
+col1 <- GetColorHexAndDecimal(color.example[1])
+col2 <- GetColorHexAndDecimal(color.example[2])
+col3 <- GetColorHexAndDecimal(color.example[3])
+col4 <- GetColorHexAndDecimal(color.example[4])
+col5 <- GetColorHexAndDecimal(color.example[5])
+col6 <- GetColorHexAndDecimal(color.example[6])
+col7 <- GetColorHexAndDecimal(color.example[7])
