@@ -9,4 +9,4 @@ http://www.seanlahman.com/baseball-archive/statistics/
 
 mlb_hitter_clustering.R - This script performs a mySQL query of a MLB database, stored at the 
                           time on my local computer, and carries out a hierarchical clustering 
-                          analysis of some key hitting stats from 1996-2015. 
+                          analysis of some key hitting stats from 1965-2015. 
