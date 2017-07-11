@@ -27,9 +27,9 @@ for(j in 1:length(yrs)){
     bat.teamID, bat.G, bat.AB, bat.R, bat.H, bat.2B, bat.3B, bat.HR, bat.RBI, 
     bat.SB, bat.CS, bat.BB, bat.SO, bat.IBB, bat.HBP, bat.SH, bat.SF, bat.GIDP, 
     app.G_all, app.G_p
-    FROM batting as bat, master as mas, appearances as app
-    WHERE mas.playerID=bat.playerID AND app.playerID=mas.playerID AND 
-    bat.yearID="
+    FROM batting as bat JOIN master as mas ON (bat.playerID=mas.playerID)
+    JOIN appearances as app ON (bat.playerID=appearances.playerID)
+    WHERE bat.yearID="
     str2 <- as.character(yrs[j])
     str3 <- ";"
     all.query <- dbGetQuery(con, paste(c(str1, str2, str3), collapse = ''))
