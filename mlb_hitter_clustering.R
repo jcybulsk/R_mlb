@@ -28,7 +28,7 @@ for(j in 1:length(yrs)){
     bat.SB, bat.CS, bat.BB, bat.SO, bat.IBB, bat.HBP, bat.SH, bat.SF, bat.GIDP, 
     app.G_all, app.G_p
     FROM batting as bat JOIN master as mas ON (bat.playerID=mas.playerID)
-    JOIN appearances as app ON (bat.playerID=appearances.playerID)
+    JOIN appearances as app ON (bat.playerID=app.playerID)
     WHERE bat.yearID="
     str2 <- as.character(yrs[j])
     str3 <- ";"
